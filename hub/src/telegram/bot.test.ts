@@ -30,7 +30,7 @@ describe('HappyBot.start', () => {
         const innerBot = bot.getBot()
 
         // Override bot.start to simulate a polling failure
-        innerBot.start = mock(() => Promise.reject(new Error('Network failure')))
+        innerBot.start = mock((): Promise<void> => Promise.reject(new Error('Network failure')))
 
         const errorSpy = spyOn(console, 'error').mockImplementation(() => {})
 
@@ -55,7 +55,7 @@ describe('HappyBot.start', () => {
         const innerBot = bot.getBot()
 
         // Simulate a long-running polling that never resolves
-        innerBot.start = mock(() => new Promise(() => {}))
+        innerBot.start = mock((): Promise<void> => new Promise(() => {}))
 
         await bot.start()
         await bot.start() // second call should be no-op
