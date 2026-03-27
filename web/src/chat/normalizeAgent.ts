@@ -120,15 +120,20 @@ function normalizeUserOutput(
         }
     }
 
+    // Non-sidechain string content user messages arriving through the agent
+    // output path are system-injected messages (e.g. subagent prompts where
+    // Claude Code didn't set isSidechain).  Real user text goes through
+    // normalizeUserRecord, never here.  Treat as sidechain so the tracer can
+    // match it to a parent Task tool call; unmatched ones are harmlessly
+    // skipped by the reducer.
     if (typeof messageContent === 'string') {
         return {
             id: messageId,
             localId,
             createdAt,
-            role: 'user',
-            isSidechain: false,
-            content: { type: 'text', text: messageContent },
-            meta
+            role: 'agent',
+            isSidechain: true,
+            content: [{ type: 'sidechain', uuid, prompt: messageContent }]
         }
     }
 

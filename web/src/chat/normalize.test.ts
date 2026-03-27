@@ -104,4 +104,88 @@ describe('normalizeDecryptedMessage', () => {
         }
         expect(firstBlock.text).toContain('"foo": "bar"')
     })
+
+    it('normalizes user output with isSidechain=true string content as sidechain', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'user',
+                    isSidechain: true,
+                    uuid: 'u-1',
+                    message: { role: 'user', content: 'Search the codebase for X' }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+        expect(normalized).toMatchObject({
+            role: 'agent',
+            isSidechain: true
+        })
+        if (normalized?.role !== 'agent') throw new Error('Expected agent')
+        expect(normalized.content[0]).toMatchObject({
+            type: 'sidechain',
+            prompt: 'Search the codebase for X'
+        })
+    })
+
+    it('normalizes user output with isSidechain=false string content as sidechain (system-injected)', () => {
+        // When Claude Code doesn't set isSidechain correctly, the message
+        // still arrives through the agent output path (not normalizeUser).
+        // It must be treated as sidechain, not shown as a user message.
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'user',
+                    isSidechain: false,
+                    uuid: 'u-2',
+                    message: { role: 'user', content: 'Search the codebase for X' }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+        expect(normalized).toMatchObject({
+            role: 'agent',
+            isSidechain: true
+        })
+        if (normalized?.role !== 'agent') throw new Error('Expected agent')
+        expect(normalized.content[0]).toMatchObject({
+            type: 'sidechain',
+            prompt: 'Search the codebase for X'
+        })
+    })
+
+    it('still normalizes user output tool_result blocks correctly', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'user',
+                    isSidechain: false,
+                    uuid: 'u-3',
+                    message: {
+                        role: 'user',
+                        content: [
+                            { type: 'tool_result', tool_use_id: 'tool-1', content: 'Success' }
+                        ]
+                    }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+        expect(normalized).toMatchObject({ role: 'agent' })
+        if (normalized?.role !== 'agent') throw new Error('Expected agent')
+        expect(normalized.content[0]).toMatchObject({
+            type: 'tool-result',
+            tool_use_id: 'tool-1',
+            content: 'Success'
+        })
+    })
 })
