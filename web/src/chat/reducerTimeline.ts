@@ -73,9 +73,18 @@ export function reduceTimeline(
         }
 
         if (msg.role === 'agent') {
+            // Check if this message contains a Task tool_use. If so, skip text blocks —
+            // Claude often writes the prompt as text before the tool_use, causing it to
+            // appear both as a standalone message AND inside the tool card.
+            const hasTaskToolUse = msg.content.some(
+                (c) => c.type === 'tool-call' && c.name === 'Task'
+            )
+
             for (let idx = 0; idx < msg.content.length; idx += 1) {
                 const c = msg.content[idx]
                 if (c.type === 'text') {
+                    if (hasTaskToolUse) continue
+
                     if (isCliOutputText(c.text, msg.meta)) {
                         blocks.push(createCliOutputBlock({
                             id: `${msg.id}:${idx}`,
