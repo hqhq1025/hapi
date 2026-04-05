@@ -53,12 +53,29 @@ describe('reduceTimeline', () => {
         expect(blocks[0].kind).toBe('user-text')
     })
 
-    it('suppresses "No response requested." assistant text blocks', () => {
+    it('suppresses "No response requested." when it is the only content block', () => {
         const { blocks } = reduceTimeline([makeAgentMessage('No response requested.')], makeContext())
 
-        // No visible block should be emitted
         const textBlocks = blocks.filter(b => b.kind === 'agent-text')
         expect(textBlocks).toHaveLength(0)
+    })
+
+    it('keeps "No response requested." when message also has other blocks (e.g. tool calls)', () => {
+        const msg: TracedMessage = {
+            id: 'msg-multi',
+            localId: null,
+            createdAt: 1_700_000_000_000,
+            role: 'agent',
+            content: [
+                { type: 'text', text: 'No response requested.', uuid: 'u-1', parentUUID: null },
+                { type: 'tool-call', id: 'tc-1', name: 'Bash', input: { command: 'ls' }, description: null, uuid: 'u-1', parentUUID: null }
+            ],
+            isSidechain: false
+        } as TracedMessage
+
+        const { blocks } = reduceTimeline([msg], makeContext())
+        const textBlocks = blocks.filter(b => b.kind === 'agent-text')
+        expect(textBlocks).toHaveLength(1)
     })
 
     it('keeps normal assistant text blocks', () => {
