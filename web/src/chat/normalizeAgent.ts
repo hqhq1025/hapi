@@ -75,6 +75,16 @@ function normalizeAssistantOutput(
     const inputTokens = usage ? asNumber(usage.input_tokens) : null
     const outputTokens = usage ? asNumber(usage.output_tokens) : null
 
+    // Drop assistant messages that are just "No response requested." — these
+    // are Claude's automatic response to system-injected user messages (task
+    // notifications, system reminders) and should not be shown to the user.
+    if (blocks.length === 1 && blocks[0].type === 'text') {
+        const trimmed = blocks[0].text.trim()
+        if (trimmed === 'No response requested.' || trimmed === 'No response requested') {
+            return null
+        }
+    }
+
     return {
         id: messageId,
         localId,
@@ -199,7 +209,18 @@ export function isSkippableAgentContent(content: unknown): boolean {
     const data = isObject(content.data) ? content.data : null
     if (!data) return false
     if (Boolean(data.isMeta) || Boolean(data.isCompactSummary)) return true
-    return !isClaudeChatVisibleMessage({ type: data.type, subtype: data.subtype })
+    if (!isClaudeChatVisibleMessage({ type: data.type, subtype: data.subtype })) return true
+
+    // Drop "No response requested." — Claude's auto-response to system-injected
+    // messages (task notifications, system reminders).
+    if (data.type === 'assistant') {
+        const msg = isObject(data.message) ? data.message : null
+        const text = typeof msg?.content === 'string' ? msg.content.trim() : null
+        if (text === 'No response requested.' || text === 'No response requested') {
+            return true
+        }
+    }
+    return false
 }
 
 export function isCodexContent(content: unknown): boolean {

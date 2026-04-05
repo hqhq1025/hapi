@@ -195,4 +195,38 @@ describe('normalizeDecryptedMessage', () => {
             isSidechain: true,
         })
     })
+
+    it('drops assistant messages that are just "No response requested."', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'assistant',
+                    uuid: 'a-1',
+                    message: { role: 'assistant', content: 'No response requested.' }
+                }
+            }
+        })
+
+        expect(normalizeDecryptedMessage(message)).toBeNull()
+    })
+
+    it('keeps assistant messages with real content', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'assistant',
+                    uuid: 'a-2',
+                    message: { role: 'assistant', content: 'Here is the answer.' }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+        expect(normalized).not.toBeNull()
+        expect(normalized?.role).toBe('agent')
+    })
 })
