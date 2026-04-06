@@ -222,4 +222,58 @@ describe('normalizeDecryptedMessage', () => {
             prompt: 'Agent prompt in array form'
         })
     })
+
+    it('treats sidechain user output with tool_result array content as sidechain', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'user',
+                    uuid: 'u4',
+                    isSidechain: true,
+                    message: { content: [
+                        { type: 'tool_result', tool_use_id: 'tc-1', content: 'result' },
+                        { type: 'text', text: 'Some subagent text' }
+                    ] }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+
+        expect(normalized).toMatchObject({
+            role: 'agent',
+            isSidechain: true,
+        })
+        if (normalized?.role !== 'agent') throw new Error('Expected agent')
+        expect(normalized.content[0]).toMatchObject({
+            type: 'sidechain',
+            prompt: 'Some subagent text'
+        })
+    })
+
+    it('does not treat non-sidechain array-content user output as sidechain', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'user',
+                    uuid: 'u5',
+                    isSidechain: false,
+                    message: { content: [{ type: 'text', text: 'Regular user message' }] }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+
+        // Non-sidechain array content should fall through to the normal
+        // array processing path, not the sidechain shortcut
+        if (normalized?.role === 'agent') {
+            const hasSidechain = normalized.content.some(c => c.type === 'sidechain')
+            expect(hasSidechain).toBe(false)
+        }
+    })
 })
