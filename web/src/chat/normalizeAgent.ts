@@ -116,7 +116,7 @@ function normalizeUserOutput(
             createdAt,
             role: 'agent',
             isSidechain: true,
-            content: [{ type: 'sidechain', uuid, prompt: messageContent }]
+            content: [{ type: 'sidechain', uuid, parentUUID, prompt: messageContent }]
         }
     }
 
@@ -135,7 +135,7 @@ function normalizeUserOutput(
             createdAt,
             role: 'agent',
             isSidechain: true,
-            content: [{ type: 'sidechain', uuid, prompt: messageContent }]
+            content: [{ type: 'sidechain', uuid, parentUUID, prompt: messageContent }]
         }
     }
 
