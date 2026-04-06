@@ -271,4 +271,52 @@ describe('normalizeDecryptedMessage', () => {
         expect(normalized).not.toBeNull()
         expect(normalized?.role).toBe('agent')
     })
+
+    it('propagates parentUuid from assistant output data to text block parentUUID', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'assistant',
+                    uuid: 'a-3',
+                    parentUuid: 'parent-injected-uuid',
+                    message: { role: 'assistant', content: 'No response requested.' }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+        expect(normalized).not.toBeNull()
+        if (normalized?.role !== 'agent') throw new Error('Expected agent')
+        expect(normalized.content).toHaveLength(1)
+        expect(normalized.content[0]).toMatchObject({
+            type: 'text',
+            text: 'No response requested.',
+            parentUUID: 'parent-injected-uuid'
+        })
+    })
+
+    it('sets parentUUID to null when parentUuid is absent in assistant output', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'assistant',
+                    uuid: 'a-4',
+                    // No parentUuid field
+                    message: { role: 'assistant', content: 'Hello.' }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+        expect(normalized).not.toBeNull()
+        if (normalized?.role !== 'agent') throw new Error('Expected agent')
+        expect(normalized.content[0]).toMatchObject({
+            type: 'text',
+            parentUUID: null
+        })
+    })
 })
