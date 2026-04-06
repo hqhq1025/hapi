@@ -105,13 +105,14 @@ describe('normalizeDecryptedMessage', () => {
         expect(firstBlock.text).toContain('"foo": "bar"')
     })
 
-    it('converts <task-notification> user output to event', () => {
+    it('normalizes <task-notification> user output as sidechain (event extracted by reducer)', () => {
         const message = makeMessage({
             role: 'agent',
             content: {
                 type: 'output',
                 data: {
                     type: 'user',
+                    uuid: 'u-notif',
                     message: { content: '<task-notification> <summary>Background command stopped</summary> </task-notification>' }
                 }
             }
@@ -119,12 +120,18 @@ describe('normalizeDecryptedMessage', () => {
 
         const normalized = normalizeDecryptedMessage(message)
 
+        // Normalizer emits as sidechain (preserving uuid for sentinel detection);
+        // the reducer extracts the summary as an event.
         expect(normalized).toMatchObject({
-            id: 'msg-1',
-            role: 'event',
-            isSidechain: false,
-            content: { type: 'message', message: 'Background command stopped' }
+            role: 'agent',
+            isSidechain: true,
         })
+        if (normalized?.role === 'agent') {
+            expect(normalized.content[0]).toMatchObject({
+                type: 'sidechain',
+                prompt: expect.stringContaining('<task-notification>')
+            })
+        }
     })
 
     it('treats <task-notification> without summary as sidechain (dropped by reducer)', () => {

@@ -18,6 +18,20 @@ export function reduceTimeline(
     const toolBlocksById = new Map<string, ToolCallBlock>()
     let hasReadyEvent = false
 
+    // Pre-scan: collect UUIDs of system-injected user turns (sidechain
+    // prompts, task notifications, system reminders).  These are used below
+    // to identify sentinel auto-replies ("No response requested.") whose
+    // parentUUID points to one of these injected messages.
+    const injectedTurnUuids = new Set<string>()
+    for (const msg of messages) {
+        if (msg.role !== 'agent' || !msg.isSidechain) continue
+        for (const c of msg.content) {
+            if (c.type === 'sidechain') {
+                injectedTurnUuids.add(c.uuid)
+            }
+        }
+    }
+
     for (const msg of messages) {
         if (msg.role === 'event') {
             if (msg.content.type === 'ready') {
@@ -95,15 +109,16 @@ export function reduceTimeline(
                     // Skip "No response requested." — Claude's sentinel auto-response
                     // to system-injected messages (task notifications, system reminders).
                     //
-                    // Conditions to avoid false positives:
+                    // Structural checks to avoid false positives:
                     //   1. msg.content.length === 1 — no tool calls or reasoning alongside
-                    //   2. c.parentUUID is set — real first-message replies have null parentUUID;
-                    //      sentinel replies always follow a prior assistant turn
+                    //   2. c.parentUUID points to a known injected turn UUID (collected
+                    //      in pre-scan from sidechain content blocks)
                     //   3. Exact text match on the known sentinel phrase
-                    //
-                    // "No response requested." is Claude's internal phrase for system
-                    // injections and will not appear as a legitimate user-facing reply.
-                    if (msg.content.length === 1 && c.parentUUID !== null) {
+                    if (
+                        msg.content.length === 1 &&
+                        c.parentUUID !== null &&
+                        injectedTurnUuids.has(c.parentUUID)
+                    ) {
                         const trimmedText = c.text.trim()
                         if (trimmedText === 'No response requested.' || trimmedText === 'No response requested') {
                             continue
@@ -258,7 +273,21 @@ export function reduceTimeline(
                 }
 
                 if (c.type === 'sidechain') {
-                    // Skip - the prompt is already visible in the parent Task tool call's input
+                    // Extract task-notification summaries as visible events
+                    const trimmedPrompt = c.prompt.trimStart()
+                    if (trimmedPrompt.startsWith('<task-notification>')) {
+                        const summary = trimmedPrompt.match(/<summary>([\s\S]*?)<\/summary>/)?.[1]?.trim()
+                        if (summary) {
+                            blocks.push({
+                                kind: 'agent-event',
+                                id: `${msg.id}:${idx}`,
+                                createdAt: msg.createdAt,
+                                event: { type: 'message', message: summary },
+                                meta: msg.meta
+                            })
+                        }
+                    }
+                    // Skip rendering prompt text (already in parent Task tool card or not user-visible)
                     continue
                 }
             }
