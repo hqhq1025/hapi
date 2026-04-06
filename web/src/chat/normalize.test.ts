@@ -203,6 +203,33 @@ describe('normalizeDecryptedMessage', () => {
         })
     })
 
+    it('treats sidechain user output with array content as sidechain', () => {
+        const message = makeMessage({
+            role: 'agent',
+            content: {
+                type: 'output',
+                data: {
+                    type: 'user',
+                    uuid: 'u3',
+                    isSidechain: true,
+                    message: { content: [{ type: 'text', text: 'This is an agent prompt in array form' }] }
+                }
+            }
+        })
+
+        const normalized = normalizeDecryptedMessage(message)
+
+        expect(normalized).toMatchObject({
+            role: 'agent',
+            isSidechain: true,
+        })
+        if (normalized?.role !== 'agent') throw new Error('Expected agent')
+        expect(normalized.content[0]).toMatchObject({
+            type: 'sidechain',
+            prompt: 'This is an agent prompt in array form'
+        })
+    })
+
     it('keeps "No response requested." text in normalized output (filtered later by reducer)', () => {
         const message = makeMessage({
             role: 'agent',

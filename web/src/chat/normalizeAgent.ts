@@ -139,6 +139,26 @@ function normalizeUserOutput(
         }
     }
 
+    // Sidechain user messages with array content (e.g. subagent prompts
+    // that Claude Code serialised as [{type:'text', text:'...'}] instead
+    // of a plain string).  Extract the text and treat as sidechain so the
+    // tracer can match it to the parent Task tool call.
+    if (isSidechain && Array.isArray(messageContent)) {
+        const textParts = messageContent
+            .filter((b: unknown) => isObject(b) && b.type === 'text' && typeof b.text === 'string')
+            .map((b: Record<string, unknown>) => b.text as string)
+        if (textParts.length > 0) {
+            return {
+                id: messageId,
+                localId,
+                createdAt,
+                role: 'agent',
+                isSidechain: true,
+                content: [{ type: 'sidechain', uuid, parentUUID, prompt: textParts.join('\n\n') }]
+            }
+        }
+    }
+
     const blocks: NormalizedAgentContent[] = []
 
     if (Array.isArray(messageContent)) {
