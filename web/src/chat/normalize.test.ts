@@ -269,8 +269,11 @@ describe('normalizeDecryptedMessage', () => {
 
         const normalized = normalizeDecryptedMessage(message)
 
-        // Non-sidechain array content should fall through to the normal
-        // array processing path, not the sidechain shortcut
+        // Non-sidechain array content falls through to the normal array
+        // processing path and is emitted as role:'agent' with text blocks.
+        // This is expected: the CLI wraps all non-string-content user
+        // messages as agent output (apiSession.ts:367). Changing that is
+        // a separate upstream concern, not part of this sidechain fix.
         if (normalized?.role === 'agent') {
             const hasSidechain = normalized.content.some(c => c.type === 'sidechain')
             expect(hasSidechain).toBe(false)
