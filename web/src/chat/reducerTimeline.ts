@@ -92,11 +92,18 @@ export function reduceTimeline(
             for (let idx = 0; idx < msg.content.length; idx += 1) {
                 const c = msg.content[idx]
                 if (c.type === 'text') {
-                    // Skip "No response requested." — Claude's auto-response to
-                    // system-injected messages. Only suppress when it's the sole
-                    // content block (no tool calls or reasoning alongside it),
-                    // so legitimate replies are never hidden.
-                    if (msg.content.length === 1) {
+                    // Skip "No response requested." — Claude's sentinel auto-response
+                    // to system-injected messages (task notifications, system reminders).
+                    //
+                    // Conditions to avoid false positives:
+                    //   1. msg.content.length === 1 — no tool calls or reasoning alongside
+                    //   2. c.parentUUID is set — real first-message replies have null parentUUID;
+                    //      sentinel replies always follow a prior assistant turn
+                    //   3. Exact text match on the known sentinel phrase
+                    //
+                    // "No response requested." is Claude's internal phrase for system
+                    // injections and will not appear as a legitimate user-facing reply.
+                    if (msg.content.length === 1 && c.parentUUID !== null) {
                         const trimmedText = c.text.trim()
                         if (trimmedText === 'No response requested.' || trimmedText === 'No response requested') {
                             continue

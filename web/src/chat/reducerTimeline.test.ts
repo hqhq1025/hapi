@@ -53,11 +53,27 @@ describe('reduceTimeline', () => {
         expect(blocks[0].kind).toBe('user-text')
     })
 
-    it('suppresses "No response requested." when it is the only content block', () => {
-        const { blocks } = reduceTimeline([makeAgentMessage('No response requested.')], makeContext())
+    it('suppresses "No response requested." when it is the sole block with a parentUUID', () => {
+        // Sentinel replies always follow a prior assistant turn (parentUUID is set)
+        const msg: TracedMessage = {
+            id: 'msg-sentinel',
+            localId: null,
+            createdAt: 1_700_000_000_000,
+            role: 'agent',
+            content: [{ type: 'text', text: 'No response requested.', uuid: 'u-1', parentUUID: 'prev-uuid' }],
+            isSidechain: false
+        } as TracedMessage
 
+        const { blocks } = reduceTimeline([msg], makeContext())
         const textBlocks = blocks.filter(b => b.kind === 'agent-text')
         expect(textBlocks).toHaveLength(0)
+    })
+
+    it('keeps "No response requested." when parentUUID is null (first message in conversation)', () => {
+        // parentUUID null = first assistant response; never a sentinel
+        const { blocks } = reduceTimeline([makeAgentMessage('No response requested.')], makeContext())
+        const textBlocks = blocks.filter(b => b.kind === 'agent-text')
+        expect(textBlocks).toHaveLength(1)
     })
 
     it('keeps "No response requested." when message also has other blocks (e.g. tool calls)', () => {
@@ -67,8 +83,8 @@ describe('reduceTimeline', () => {
             createdAt: 1_700_000_000_000,
             role: 'agent',
             content: [
-                { type: 'text', text: 'No response requested.', uuid: 'u-1', parentUUID: null },
-                { type: 'tool-call', id: 'tc-1', name: 'Bash', input: { command: 'ls' }, description: null, uuid: 'u-1', parentUUID: null }
+                { type: 'text', text: 'No response requested.', uuid: 'u-1', parentUUID: 'prev-uuid' },
+                { type: 'tool-call', id: 'tc-1', name: 'Bash', input: { command: 'ls' }, description: null, uuid: 'u-1', parentUUID: 'prev-uuid' }
             ],
             isSidechain: false
         } as TracedMessage
