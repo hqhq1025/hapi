@@ -303,10 +303,18 @@ export function HappyComposer(props: {
             return // let default textarea behavior handle newline
         }
 
+        // Enter with suggestions visible: select the suggestion
+        if (key === 'Enter' && suggestions.length > 0) {
+            e.preventDefault()
+            const indexToSelect = selectedIndex >= 0 ? selectedIndex : 0
+            handleSuggestionSelect(indexToSelect)
+            return
+        }
+
         // Only plain Enter (no modifiers) sends; other modifier combos are ignored
         if (key === 'Enter') {
             e.preventDefault()
-            if (!e.ctrlKey && !e.altKey && !e.metaKey && canSend && suggestions.length === 0) {
+            if (!e.ctrlKey && !e.altKey && !e.metaKey && canSend) {
                 api.composer().send()
                 setShowContinueHint(false)
             }
@@ -324,7 +332,7 @@ export function HappyComposer(props: {
                 moveDown()
                 return
             }
-            if ((key === 'Enter' || key === 'Tab') && !e.shiftKey) {
+            if ((key === 'Tab') && !e.shiftKey) {
                 e.preventDefault()
                 const indexToSelect = selectedIndex >= 0 ? selectedIndex : 0
                 handleSuggestionSelect(indexToSelect)
