@@ -163,7 +163,12 @@ export class SyncEngine {
 
     handleRealtimeEvent(event: SyncEvent): void {
         if (event.type === 'session-updated' && event.sessionId) {
+            const before = this.sessionCache.getSession(event.sessionId)
             this.sessionCache.refreshSession(event.sessionId)
+            const after = this.sessionCache.getSession(event.sessionId)
+            if (after?.metadata && !this.hasSameAgentSessionIds(before?.metadata ?? null, after.metadata)) {
+                void this.sessionCache.deduplicateByAgentSessionId(event.sessionId).catch(() => {})
+            }
             return
         }
 
@@ -439,6 +444,17 @@ export class SyncEngine {
         }
 
         return { type: 'success', sessionId: spawnResult.sessionId }
+    }
+
+    private hasSameAgentSessionIds(
+        prev: Session['metadata'] | null,
+        next: NonNullable<Session['metadata']>
+    ): boolean {
+        return (prev?.codexSessionId ?? null) === (next.codexSessionId ?? null)
+            && (prev?.claudeSessionId ?? null) === (next.claudeSessionId ?? null)
+            && (prev?.geminiSessionId ?? null) === (next.geminiSessionId ?? null)
+            && (prev?.opencodeSessionId ?? null) === (next.opencodeSessionId ?? null)
+            && (prev?.cursorSessionId ?? null) === (next.cursorSessionId ?? null)
     }
 
     async waitForSessionActive(sessionId: string, timeoutMs: number = 15_000): Promise<boolean> {

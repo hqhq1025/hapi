@@ -10,6 +10,7 @@ export class SessionCache {
     private readonly sessions: Map<string, Session> = new Map()
     private readonly lastBroadcastAtBySessionId: Map<string, number> = new Map()
     private readonly todoBackfillAttemptedSessionIds: Set<string> = new Set()
+    private readonly deduplicateInProgress: Set<string> = new Set()
 
     constructor(
         private readonly store: Store,
@@ -536,5 +537,48 @@ export class SessionCache {
         }
 
         return changed ? merged : newMetadata
+    }
+
+    private extractAgentSessionId(
+        metadata: NonNullable<Session['metadata']>
+    ): { field: 'codexSessionId' | 'claudeSessionId' | 'geminiSessionId' | 'opencodeSessionId' | 'cursorSessionId'; value: string } | null {
+        if (metadata.codexSessionId) return { field: 'codexSessionId', value: metadata.codexSessionId }
+        if (metadata.claudeSessionId) return { field: 'claudeSessionId', value: metadata.claudeSessionId }
+        if (metadata.geminiSessionId) return { field: 'geminiSessionId', value: metadata.geminiSessionId }
+        if (metadata.opencodeSessionId) return { field: 'opencodeSessionId', value: metadata.opencodeSessionId }
+        if (metadata.cursorSessionId) return { field: 'cursorSessionId', value: metadata.cursorSessionId }
+        return null
+    }
+
+    async deduplicateByAgentSessionId(sessionId: string): Promise<void> {
+        const session = this.sessions.get(sessionId)
+        if (!session?.metadata) return
+
+        const agentId = this.extractAgentSessionId(session.metadata)
+        if (!agentId) return
+
+        if (this.deduplicateInProgress.has(agentId.value)) return
+        this.deduplicateInProgress.add(agentId.value)
+
+        try {
+            const duplicates: string[] = []
+            for (const [existingId, existing] of this.sessions) {
+                if (existingId === sessionId) continue
+                if (existing.namespace !== session.namespace) continue
+                if (!existing.metadata) continue
+                if (existing.metadata[agentId.field] !== agentId.value) continue
+                duplicates.push(existingId)
+            }
+
+            for (const duplicateId of duplicates) {
+                try {
+                    await this.mergeSessions(duplicateId, sessionId, session.namespace)
+                } catch {
+                    // best-effort: duplicate remains if merge fails
+                }
+            }
+        } finally {
+            this.deduplicateInProgress.delete(agentId.value)
+        }
     }
 }

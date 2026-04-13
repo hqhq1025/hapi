@@ -39,6 +39,35 @@ function getGroupDisplayName(directory: string): string {
 
 export const UNKNOWN_MACHINE_ID = '__unknown__'
 
+function deduplicateSessionsByAgentId(sessions: SessionSummary[]): SessionSummary[] {
+    const byAgentId = new Map<string, SessionSummary[]>()
+    const result: SessionSummary[] = []
+
+    for (const session of sessions) {
+        const agentId = session.metadata?.agentSessionId
+        if (!agentId) {
+            result.push(session)
+            continue
+        }
+        const group = byAgentId.get(agentId)
+        if (group) {
+            group.push(session)
+        } else {
+            byAgentId.set(agentId, [session])
+        }
+    }
+
+    for (const group of byAgentId.values()) {
+        group.sort((a, b) => {
+            if (a.active !== b.active) return a.active ? -1 : 1
+            return b.updatedAt - a.updatedAt
+        })
+        result.push(group[0])
+    }
+
+    return result
+}
+
 function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
     const groups = new Map<string, { directory: string; machineId: string | null; sessions: SessionSummary[] }>()
 
@@ -453,7 +482,7 @@ export function SessionList(props: {
     const { t } = useTranslation()
     const { renderHeader = true, api, selectedSessionId, machineLabelsById = {} } = props
     const groups = useMemo(
-        () => groupSessionsByDirectory(props.sessions),
+        () => groupSessionsByDirectory(deduplicateSessionsByAgentId(props.sessions)),
         [props.sessions]
     )
     const [collapseOverrides, setCollapseOverrides] = useState<Map<string, boolean>>(

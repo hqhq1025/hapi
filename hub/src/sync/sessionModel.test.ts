@@ -440,4 +440,104 @@ describe('session model', () => {
             engine.stop()
         }
     })
+
+    describe('session dedup by agent session ID', () => {
+        it('merges duplicate when codexSessionId collides', async () => {
+            const store = new Store(':memory:')
+            const events: SyncEvent[] = []
+            const cache = new SessionCache(store, createPublisher(events))
+
+            const s1 = cache.getOrCreateSession(
+                'tag-1',
+                { path: '/tmp/project', host: 'localhost', flavor: 'codex', codexSessionId: 'thread-X' },
+                null,
+                'default'
+            )
+
+            // Add a message to s1
+            store.messages.addMessage(s1.id, { type: 'text', text: 'hello from s1' }, 'local-1')
+
+            const s2 = cache.getOrCreateSession(
+                'tag-2',
+                { path: '/tmp/project', host: 'localhost', flavor: 'codex', codexSessionId: 'thread-X' },
+                null,
+                'default'
+            )
+
+            expect(s1.id).not.toBe(s2.id)
+
+            await cache.deduplicateByAgentSessionId(s2.id)
+
+            expect(cache.getSession(s1.id)).toBeUndefined()
+            expect(cache.getSession(s2.id)).toBeDefined()
+
+            const messages = store.messages.getMessages(s2.id, 100)
+            expect(messages.length).toBeGreaterThanOrEqual(1)
+        })
+
+        it('preserves sessions with different agent session IDs', async () => {
+            const store = new Store(':memory:')
+            const events: SyncEvent[] = []
+            const cache = new SessionCache(store, createPublisher(events))
+
+            const s1 = cache.getOrCreateSession(
+                'tag-1',
+                { path: '/tmp/project', host: 'localhost', flavor: 'codex', codexSessionId: 'thread-X' },
+                null,
+                'default'
+            )
+            const s2 = cache.getOrCreateSession(
+                'tag-2',
+                { path: '/tmp/project', host: 'localhost', flavor: 'codex', codexSessionId: 'thread-Y' },
+                null,
+                'default'
+            )
+
+            await cache.deduplicateByAgentSessionId(s2.id)
+
+            expect(cache.getSession(s1.id)).toBeDefined()
+            expect(cache.getSession(s2.id)).toBeDefined()
+        })
+
+        it('does not merge across namespaces', async () => {
+            const store = new Store(':memory:')
+            const events: SyncEvent[] = []
+            const cache = new SessionCache(store, createPublisher(events))
+
+            const s1 = cache.getOrCreateSession(
+                'tag-1',
+                { path: '/tmp/project', host: 'localhost', flavor: 'codex', codexSessionId: 'thread-X' },
+                null,
+                'ns1'
+            )
+            const s2 = cache.getOrCreateSession(
+                'tag-2',
+                { path: '/tmp/project', host: 'localhost', flavor: 'codex', codexSessionId: 'thread-X' },
+                null,
+                'ns2'
+            )
+
+            await cache.deduplicateByAgentSessionId(s2.id)
+
+            expect(cache.getSession(s1.id)).toBeDefined()
+            expect(cache.getSession(s2.id)).toBeDefined()
+        })
+
+        it('no-op when session has no agent session ID', async () => {
+            const store = new Store(':memory:')
+            const events: SyncEvent[] = []
+            const cache = new SessionCache(store, createPublisher(events))
+
+            const s1 = cache.getOrCreateSession(
+                'tag-1',
+                { path: '/tmp/project', host: 'localhost', flavor: 'codex' },
+                null,
+                'default'
+            )
+
+            await cache.deduplicateByAgentSessionId(s1.id)
+
+            expect(cache.getSession(s1.id)).toBeDefined()
+        })
+    })
 })
