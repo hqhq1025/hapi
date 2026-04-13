@@ -471,6 +471,8 @@ export class SessionCache {
             )
         }
 
+        // Preserve agentState if the new session has none. Only inactive duplicates reach
+        // this point (active ones are skipped), so the old agentState is typically stale.
         if (oldStored.agentState !== null && newStored.agentState === null) {
             this.store.sessions.updateSessionAgentState(
                 newSessionId,

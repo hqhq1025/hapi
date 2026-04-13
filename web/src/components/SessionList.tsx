@@ -59,10 +59,11 @@ function deduplicateSessionsByAgentId(sessions: SessionSummary[], selectedSessio
 
     for (const group of byAgentId.values()) {
         group.sort((a, b) => {
-            // Keep the currently selected session visible so the sidebar row doesn't vanish
+            // Active session always wins — it's the live connection
+            if (a.active !== b.active) return a.active ? -1 : 1
+            // Among inactive duplicates, keep the selected one visible
             if (a.id === selectedSessionId) return -1
             if (b.id === selectedSessionId) return 1
-            if (a.active !== b.active) return a.active ? -1 : 1
             return b.updatedAt - a.updatedAt
         })
         result.push(group[0])
