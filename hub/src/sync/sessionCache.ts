@@ -557,6 +557,8 @@ export class SessionCache {
         const agentId = this.extractAgentSessionId(session.metadata)
         if (!agentId) return
 
+        // Guard: skip if another dedup for this agent ID is already in progress.
+        // A skipped trigger is acceptable — the web-side display dedup hides any remaining duplicates.
         if (this.deduplicateInProgress.has(agentId.value)) return
         this.deduplicateInProgress.add(agentId.value)
 
@@ -570,6 +572,9 @@ export class SessionCache {
                 duplicates.push(existingId)
             }
 
+            // Merge direction: duplicate → current session. The current session is the one
+            // whose CLI just connected and set the agent session ID, so its Socket.IO room
+            // is active. Messages from duplicates are moved into it; no data is lost.
             for (const duplicateId of duplicates) {
                 try {
                     await this.mergeSessions(duplicateId, sessionId, session.namespace)

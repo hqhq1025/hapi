@@ -163,11 +163,15 @@ export class SyncEngine {
 
     handleRealtimeEvent(event: SyncEvent): void {
         if (event.type === 'session-updated' && event.sessionId) {
+            // Snapshot agent session IDs before refresh — safe because JS is single-threaded
+            // and refreshSession replaces the Map entry with a new object.
             const before = this.sessionCache.getSession(event.sessionId)
             this.sessionCache.refreshSession(event.sessionId)
             const after = this.sessionCache.getSession(event.sessionId)
             if (after?.metadata && !this.hasSameAgentSessionIds(before?.metadata ?? null, after.metadata)) {
-                void this.sessionCache.deduplicateByAgentSessionId(event.sessionId).catch(() => {})
+                void this.sessionCache.deduplicateByAgentSessionId(event.sessionId).catch(() => {
+                    // best-effort: dedup failure is harmless, web-side safety net hides remaining duplicates
+                })
             }
             return
         }
