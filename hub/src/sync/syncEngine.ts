@@ -445,11 +445,17 @@ export class SyncEngine {
         }
 
         if (spawnResult.sessionId !== access.sessionId) {
-            try {
-                await this.sessionCache.mergeSessions(access.sessionId, spawnResult.sessionId, namespace)
-            } catch (error) {
-                const message = error instanceof Error ? error.message : 'Failed to merge resumed session'
-                return { type: 'error', message, code: 'resume_failed' }
+            // The old session may have already been merged by the automatic dedup path
+            // (triggered when the spawned CLI sets its agent session ID in metadata).
+            // Only attempt the explicit merge if the old session still exists.
+            const oldSession = this.sessionCache.getSessionByNamespace(access.sessionId, namespace)
+            if (oldSession) {
+                try {
+                    await this.sessionCache.mergeSessions(access.sessionId, spawnResult.sessionId, namespace)
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Failed to merge resumed session'
+                    return { type: 'error', message, code: 'resume_failed' }
+                }
             }
         }
 
