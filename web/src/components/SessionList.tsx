@@ -39,7 +39,7 @@ function getGroupDisplayName(directory: string): string {
 
 export const UNKNOWN_MACHINE_ID = '__unknown__'
 
-function deduplicateSessionsByAgentId(sessions: SessionSummary[], selectedSessionId?: string | null): SessionSummary[] {
+export function deduplicateSessionsByAgentId(sessions: SessionSummary[], selectedSessionId?: string | null): SessionSummary[] {
     const byAgentId = new Map<string, SessionSummary[]>()
     const result: SessionSummary[] = []
 
